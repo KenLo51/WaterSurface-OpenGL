@@ -32,3 +32,7 @@ Sun light : 調整光源參數。<br>
 <img src="https://i.imgur.com/mlWGNoW.png" width="400" height="233" /><img src="https://i.imgur.com/oBfLAS8.png" width="400" height="233" />
 <img src="https://i.imgur.com/2RsL3Ey.png" width="400" height="233" /><img src="https://i.imgur.com/nIYqwnY.png" width="400" height="233" />
 <img src="https://i.imgur.com/UlLyZ3R.gif" width="200" height="200" />
+
+#### 待做
+1. 使用PBO減少模擬結果傳遞至GPU時間。
+2. 在使用更多FBO直接於GPU模擬水面波動。
