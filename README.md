@@ -46,4 +46,5 @@ Python中模擬2維波動結果
 
 #### 待做
 1. 使用PBO減少模擬結果傳遞至GPU時間。
-2. 在使用更多FBO直接於GPU模擬水面波動。
+2. 在使用更多FBO直接於GPU模擬水面波動。  
+3. Height map改為使用3D Texture。  
