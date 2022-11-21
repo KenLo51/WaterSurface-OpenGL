@@ -4,7 +4,7 @@
 2. 依據當下Camera位置，於相同位置但限制Refraction View確保可觀察水面正下方，並繪製Refraction Map。  
 3. Reflection View使用當下Camera位置與水面鏡射位置繪製Reflection Map。  
 4. 依據陽光方向繪製Depth Map用以製作陰影，繪製Depth Map時只會只物體背面(glCullFace(GL_BACK);)。  
-5. 模擬2D波動參考["Wave equation - Wikipedia"](https://en.wikipedia.org/wiki/Wave_equation)，每偵更新2次微分數值計算ODE。因此若時間間隔(ODE中各項係數設定)錯誤，可能使其結果發散無法正確模擬。於/source code/pythonWaveSimulation/中為ODE公式驗證用以設定ODE中系數。
+5. 模擬2D波動參考["Wave equation - Wikipedia"](https://en.wikipedia.org/wiki/Wave_equation)，每偵更新2次微分數值計算ODE。因此若時間間隔(ODE中各項係數設定)錯誤，可能使其結果發散無法正確模擬。於/source code/pythonWaveSimulation/中為ODE公式驗證Python程式，並設定ODE中各項系數。
 
 #### Libraries
 1. [Glad](https://glad.dav1d.de/)<br>
