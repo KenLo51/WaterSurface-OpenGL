@@ -14,7 +14,7 @@
 4. 依據陽光方向繪製Depth Map用以製作陰影，繪製Depth Map時只會只物體背面(glCullFace(GL_BACK);)。  
 5. 模擬2D波動參考["Wave equation - Wikipedia"](https://en.wikipedia.org/wiki/Wave_equation)，每偵更新2次微分數值計算ODE。因此若時間間隔(ODE中各項係數設定)錯誤，可能使其結果發散無法正確模擬。於/source code/pythonWaveSimulation/中為ODE公式驗證Python程式，並設定ODE中各項系數。
 
-#### Libraries
+# Libraries
 1. [Glad](https://glad.dav1d.de/)<br>
 2. [GLFW](https://www.glfw.org/)<br>
 2. [OpenGL 3.3](https://www.opengl.org/)<br>
@@ -22,10 +22,10 @@
 4. [Dear ImGui](https://github.com/ocornut/imgui)<br>
 
  
- #### Materials
+# 使用素材
  1. [Floor Tiles 09](https://polyhaven.com/a/floor_tiles_09)
  
-#### 功能說明
+# 功能說明
 <img src="https://i.imgur.com/af1vum4.png" width="697" height="672" />
 
 
@@ -42,7 +42,7 @@ Water : 調整水面參數。<br>
 Sun light : 調整光源參數。<br>
 
 
-#### 運行結果
+# 運行結果
 |<img src="https://i.imgur.com/mlWGNoW.png" width="400" height="233" />|<img src="https://i.imgur.com/oBfLAS8.png" width="400" height="233" />|
 | :-: | :-: |
 | 以 Sin 函數製作水波 | 水波模擬 |
@@ -52,7 +52,7 @@ Sun light : 調整光源參數。<br>
 <img src="https://i.imgur.com/UlLyZ3R.gif" width="200" height="200" />  
 Python中模擬2維波動結果  
 
-#### 待做
+# 待做
 1. 使用PBO(Pixel Buffer Object)減少模擬結果傳遞至GPU時間。
 2. 使用多個FBO或Compute Shader直接於GPU模擬水面波動。  
 3. Height map貼圖動畫從多個2D Textures改為使用單個3D Texture。  
