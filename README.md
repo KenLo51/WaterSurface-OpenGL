@@ -13,6 +13,7 @@
 | 反射永遠為主Camera以水面鏡射位置 |
 4. 依據陽光方向繪製Depth Map用以製作陰影，繪製Depth Map時只會只物體背面(glCullFace(GL_BACK);)。  
 5. 模擬2D波動參考["Wave equation - Wikipedia"](https://en.wikipedia.org/wiki/Wave_equation)，每偵更新2次微分數值計算ODE。因此若時間間隔(ODE中各項係數設定)錯誤，可能使其結果發散無法正確模擬。於/source code/pythonWaveSimulation/中為ODE公式驗證Python程式，並設定ODE中各項系數。
+6. 使用Compute Shader計算波動，原先為於CPU計算完畢後已Texture2D傳入GPU使用。(2022/11/27)  
 
 # Libraries
 1. [Glad](https://glad.dav1d.de/)<br>
@@ -53,7 +54,7 @@ Sun light : 調整光源參數。<br>
 Python中模擬2維波動結果  
 
 # 待做
-1. 使用PBO(Pixel Buffer Object)減少模擬結果傳遞至GPU時間。
-2. 使用多個FBO或Compute Shader直接於GPU模擬水面波動。  
+1. ~~使用PBO(Pixel Buffer Object)減少模擬結果傳遞至GPU時間。~~(2022/11/27)  
+2. ~~使用多個FBO或Compute Shader直接於GPU模擬水面波動。~~(2022/11/27)    
 3. Height map貼圖動畫從多個2D Textures改為使用單個3D Texture。  
 4. perlin noise製作水面波浪。  
