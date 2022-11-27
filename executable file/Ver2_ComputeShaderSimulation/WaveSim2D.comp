@@ -1,0 +1,61 @@
+#version 430 core
+#define M_PI 3.1415926535897932384626433832795
+
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+layout(r32f) uniform image2D diff1ImgSrc;
+layout(r32f) uniform image2D diff1ImgDst;
+layout(r32f) uniform image2D dataImgSrc;
+layout(r32f) uniform image2D dataImgDst;
+
+layout( location=0 ) uniform float Velocity;
+layout( location=1 ) uniform float Attenuation;
+layout( location=2 ) uniform vec3 ForcePos;
+layout( location=3 ) uniform bool clear;
+void main()
+{
+	ivec2 grid_size = imageSize(dataImgSrc);
+	float size_scale = (grid_size.x + grid_size.y) / 2.0;
+	ivec2 grid_coords = ivec2(gl_GlobalInvocationID.xy);
+
+	if(clear){
+		imageStore(diff1ImgDst, grid_coords, vec4(0));
+		imageStore(dataImgDst, grid_coords, vec4(0.5));
+		return;
+	}
+	float diff2 = 0.0;
+//	diff2 +=(imageLoad(dataImgSrc, grid_coords+ivec2( 0, 1)).r - imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r) - 
+//			(imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r - imageLoad(dataImgSrc, grid_coords+ivec2( 0,-1)).r);
+
+	if((grid_coords.y+1) < grid_size.y) diff2 +=imageLoad(dataImgSrc, grid_coords+ivec2( 0, 1)).r;
+	else diff2 += imageLoad(dataImgSrc, grid_coords).r;
+	diff2 += -imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r;
+	diff2 += -imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r;
+	if((grid_coords.y-1) >= 0) diff2 += imageLoad(dataImgSrc, grid_coords+ivec2( 0,-1)).r;
+	else diff2 += imageLoad(dataImgSrc, grid_coords).r;
+
+//	diff2 +=(imageLoad(dataImgSrc, grid_coords+ivec2( 1, 0)).r - imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r) - 
+//			(imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r - imageLoad(dataImgSrc, grid_coords+ivec2(-1, 0)).r);
+
+	if((grid_coords.x+1) < grid_size.x) diff2 += imageLoad(dataImgSrc, grid_coords+ivec2( 1, 0)).r;
+	else diff2 += imageLoad(dataImgSrc, grid_coords).r;
+	diff2 += -imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r;
+	diff2 += -imageLoad(dataImgSrc, grid_coords+ivec2( 0, 0)).r;
+	if((grid_coords.x-1) >= 0) diff2 += imageLoad(dataImgSrc, grid_coords+ivec2(-1, 0)).r;
+	else diff2 += imageLoad(dataImgSrc, grid_coords).r;
+
+	
+	diff2 = diff2 * pow(Velocity, 2.0) + 0.005 * (0.5 - imageLoad(dataImgSrc, grid_coords).r);
+	//float forceVal = 0.005 * size_scale * ForcePos.z / (length(grid_coords - (ForcePos.xy * grid_size)) + 4);
+	//float forceVal = ForcePos.z / (length(vec2(grid_coords)/vec2(grid_size) - ForcePos.xy) * 200.0 + 1.0);
+	//forceVal = pow(forceVal, 1.0);
+	//float forceVal = ForcePos.z * cos(length(vec2(grid_coords)/vec2(grid_size) - ForcePos.xy) * 30.0);
+	float forceVal = 0.0;
+	float forceLen = length(vec2(grid_coords)/vec2(grid_size) - ForcePos.xy) * 100.0;
+	if(forceLen <= M_PI) forceVal = ForcePos.z * (cos(forceLen) + 1.0) * 0.5;
+
+	float diff1 = imageLoad(diff1ImgSrc, grid_coords).r * Attenuation + diff2 + forceVal;
+	float value = (imageLoad(dataImgSrc, grid_coords).r - 0.5)+ diff1;
+
+	imageStore(diff1ImgDst, grid_coords, vec4(diff1));
+	imageStore(dataImgDst, grid_coords, vec4(value + 0.5));
+}
