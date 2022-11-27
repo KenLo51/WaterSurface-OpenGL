@@ -18,7 +18,7 @@
 # Libraries
 1. [Glad](https://glad.dav1d.de/)<br>
 2. [GLFW](https://www.glfw.org/)<br>
-2. [OpenGL 3.3](https://www.opengl.org/)<br>
+2. [OpenGL 4.3](https://www.opengl.org/)<br>
 3. [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)<br>
 4. [Dear ImGui](https://github.com/ocornut/imgui)<br>
 
