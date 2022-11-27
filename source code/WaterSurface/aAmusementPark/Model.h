@@ -50,6 +50,7 @@ public:
 	// draw model
 	void Draw();
 	void Draw(Shader& shader);
+	void DrawDepths(Shader& shader);
 
 	// delete model
 	void Delete();
@@ -73,10 +74,12 @@ public:
 class Material{
 // constants or static variables
 public:
+	static const int TYPE_ALL;
 	static const int TYPE_DIFFUSE;
 	static const int TYPE_AMBIENT;
 	static const int TYPE_SPECULAR;
 	static const int TYPE_NORMAL;
+	static const int TYPE_OPACITY;
 
 // private funstions
 private:
@@ -90,7 +93,7 @@ public:
 	//void LoadTextures(std::map<std::string, std::string>& fileNameDict);
 	void LoadTextures(int type, const char *fileName);
 
-	void Use(Shader& shader);
+	void Use(Shader& shader, const int useType = Material::TYPE_ALL);
 	// delete textures
 	void Delete();
 
@@ -100,7 +103,7 @@ public:
 	Texture* texAmbient;
 	Texture* texSpecular;
 	Texture* texNormal;
-
+	Texture* texAlpha;
 // public variables
 public:
 

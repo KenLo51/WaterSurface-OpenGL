@@ -54,8 +54,8 @@ void main()
     normal.y = 1.0;
 
     //position_v4.y = position_v4.y + (sin(theta * texScale.x + texOffset.x) + sin(theta * texScale.y + texOffset.y)) * ampltidue;
-    normal.x =  -cos((texcoord_vert.x + texcoord_vert.y)) * texScale.x;
-    normal.z =  cos((texcoord_vert.x + texcoord_vert.y)) * texScale.y;
+    normal.x =  -cos((texcoord_vert.x + texcoord_vert.y));
+    normal.z =  cos((texcoord_vert.x + texcoord_vert.y));
     normal.xz = normal.xz * ampltidue * 0.1;
     normal = normalize(normal);
 

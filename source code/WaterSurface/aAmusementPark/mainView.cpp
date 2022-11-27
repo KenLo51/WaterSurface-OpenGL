@@ -3,7 +3,7 @@
 const int MainView::WATERTYPE_SINEWAVE = 0;
 const int MainView::WATERTYPE_HEIGHTMAP = 1;
 const int MainView::WATERTYPE_SIMULATION = 2;
-const int MainView::WATER_SIMULATION_RESOLUTION = 200;
+const int MainView::WATER_SIMULATION_RESOLUTION = 400;
 
 MainView::MainView(MainWindow* mw) {
 	MainView::mainWindow = mw;
@@ -12,6 +12,7 @@ MainView::MainView(MainWindow* mw) {
 	directionalLight_phi = 67.0f;
 	waterSinTheta = glm::vec2(0.0f, 0.0f);
 	waterSimulationClear = false;
+	limitFrameRate = true;
 }
 
 void MainView::drawImgui() {
@@ -54,6 +55,16 @@ void MainView::drawImgui() {
 		waterSimulation->Velocity = 0.2f;
 		waterSimulation->Force = 0.045;
 	}
+
+	bool limitFrameRate_prev = limitFrameRate;
+	ImGui::SameLine();
+	ImGui::Checkbox("Limit Frame Rate", &limitFrameRate);
+	if ((limitFrameRate_prev == false) && (limitFrameRate == true))
+		glfwSwapInterval(1);
+	if ((limitFrameRate_prev == true) && (limitFrameRate == false))
+		glfwSwapInterval(0);
+
+
 	ImGui::RadioButton("Sine Wave", &waterType, WATERTYPE_SINEWAVE); ImGui::SameLine();
 	ImGui::RadioButton("Height Map", &waterType, WATERTYPE_HEIGHTMAP); ImGui::SameLine();
 	ImGui::RadioButton("Simulation", &waterType, WATERTYPE_SIMULATION);
@@ -261,17 +272,45 @@ void MainView::initViewObjects() {
 
 	// init simulation /////////////////////////////////////////////////////////////////////////////////////////
 	waterSimulation = new WaveSimulation(WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION);
-	glGenTextures(1, &TexSimulationWaterHeightID);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, TexSimulationWaterHeightID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION, 0, GL_RED, GL_FLOAT, waterSimulation->datas);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// CPU
+	//glGenTextures(1, &TexSimulationWaterHeightID);
+	//glActiveTexture(GL_TEXTURE0);
+	//glBindTexture(GL_TEXTURE_2D, TexSimulationWaterHeightID);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION, 0, GL_RED, GL_FLOAT, waterSimulation->datas);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//glBindTexture(GL_TEXTURE_2D, 0);
 
 	TexSimulationWaterHeight = new Texture(TexSimulationWaterHeightID);
+
+
+
+
+	// Compute Shader
+	int work_grp_cnt[3];
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt[0]);
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_cnt[1]);
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_cnt[2]);
+	std::cout << "Max work groups per compute shader" <<
+		" x:" << work_grp_cnt[0] <<
+		" y:" << work_grp_cnt[1] <<
+		" z:" << work_grp_cnt[2] << "\n";
+
+	int work_grp_size[3];
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
+	std::cout << "Max work group sizes" <<
+		" x:" << work_grp_size[0] <<
+		" y:" << work_grp_size[1] <<
+		" z:" << work_grp_size[2] << "\n";
+
+	int work_grp_inv;
+	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
+	std::cout << "Max invocations count per work group: " << work_grp_inv << "\n";
 }
 
 void MainView::resize(int width, int height) {
@@ -591,11 +630,14 @@ void MainView::draw(float deltaTime) {
 	drawView(deltaTime);
 }
 
+// Water Simulation ///////////////////////////////////////////////////////////
+// Compute Shader
 void MainView::updateParameter(float deltaTime) {
 	if (waterSimulationClear) {
 		waterSimulation->Clear();
 	}
 	if ((MainView::waterType == MainView::WATERTYPE_SIMULATION) && MainView::waterRun) {
+		float data[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 		if (glfwGetMouseButton(mainWindow->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 			double mouseX, mouseY;
 			glfwGetCursorPos(mainWindow->window, &mouseX, &mouseY);
@@ -613,100 +655,277 @@ void MainView::updateParameter(float deltaTime) {
 			MainView::clickposShader->setUniform("model", MainView::waterModel->transform);
 			MainView::waterModel->Draw();
 			
-			float data[4];
 			glPixelStoref(GL_UNPACK_ALIGNMENT, 1);
 			glReadPixels(mouseX, mouseY, 1, 1, GL_RGBA, GL_FLOAT, data);
 
 			glBindBuffer(GL_FRAMEBUFFER, 0);
 
 			//printf("  %7.2lf-%7.2lf-%7.2lf\n", data[0], data[1], data[2]);
-			
-			if (data[2] == 1.0f) {
-				waterSimulation->Add(MainView::WATER_SIMULATION_RESOLUTION* data[0], MainView::WATER_SIMULATION_RESOLUTION * data[1], 0.1);
-			}
 		}
-		waterSimulation->Update();
-		glBindTexture(GL_TEXTURE_2D, TexSimulationWaterHeightID);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION, 0, GL_RED, GL_FLOAT, waterSimulation->datas);
-		glBindTexture(GL_TEXTURE_2D, 0);
+		waterSimulation->Update(MainView::WATER_SIMULATION_RESOLUTION * data[0], MainView::WATER_SIMULATION_RESOLUTION * data[1], (data[2]==1.0f)? 0.1f : 0.0f, deltaTime);
+		TexSimulationWaterHeightID = waterSimulation->dataTex[waterSimulation->currTex];
+		TexSimulationWaterHeight->ID = TexSimulationWaterHeightID;
+
+//		glBindTexture(GL_TEXTURE_2D, TexSimulationWaterHeightID);
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION, 0, GL_RED, GL_FLOAT, waterSimulation->datas);
+//		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 }
-
 
 WaveSimulation::WaveSimulation(int width, int height) {
 	WaveSimulation::width = width;
 	WaveSimulation::height = height;
+	WaveSimulation::currTex = 0;
 
-	WaveSimulation::datas = new float[width * height];
-	WaveSimulation::diff1 = new float[width * height];
-	WaveSimulation::diff2 = new float[width * height];
+	for (unsigned int i = 0; i < 2; i++) {
+		glGenTextures(1, &(WaveSimulation::diff1Tex[i]));
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, WaveSimulation::diff1Tex[i]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//glTexStorage2D(WaveSimulation::diff1Tex[i], 1, GL_R32F, WaveSimulation::width, WaveSimulation::height);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, WaveSimulation::width, WaveSimulation::height, 0, GL_RED, GL_FLOAT, NULL);
+		glBindImageTexture(0 + i, WaveSimulation::diff1Tex[i], 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+	}
 
-	for (unsigned int i = 0; i < width * height; i++) {
-		WaveSimulation::datas[i] = 0.5f;
-		WaveSimulation::diff1[i] = 0.0f;
-		WaveSimulation::diff2[i] = 0.0f;
+	for (unsigned int i = 0; i < 2; i++) {
+		glGenTextures(1, &(WaveSimulation::dataTex[i]));
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, WaveSimulation::dataTex[i]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//glTexStorage2D(WaveSimulation::dataTex[i], 1, GL_R32F, WaveSimulation::width, WaveSimulation::height);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, WaveSimulation::width, WaveSimulation::height, 0, GL_RED, GL_FLOAT, NULL);
+		glBindImageTexture(2 + i, WaveSimulation::dataTex[i], 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+	}
+
+	WaveSimulation::computeShader = glCreateShader(GL_COMPUTE_SHADER);
+	std::string computeSourceString = ShaderBase::get_file_contents("WaveSim2D.comp");
+	const char* computeSourceStringPtr = computeSourceString.c_str();
+	glShaderSource(computeShader, 1, &computeSourceStringPtr, NULL);
+	glCompileShader(computeShader);
+
+	// check if compile success
+	GLint success;
+	glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		char infoLog[512];
+		glGetShaderInfoLog(computeShader, sizeof(infoLog), NULL, infoLog);
+		std::cout << "ERROR::SHADER::COMPUTE::COMPILATION_FAILED\n" << infoLog << std::endl;
+		exit(1);
+	}
+	std::cout << "compute shader compile success" << std::endl;
+
+	WaveSimulation::computeProgram = glCreateProgram();
+	glAttachShader(computeProgram, computeShader);
+	glLinkProgram(computeProgram);
+
+	// check if compile success
+	success;
+	glGetShaderiv(computeProgram, GL_LINK_STATUS, &success);
+	if (!success)
+	{
+		char infoLog[512];
+		glGetShaderInfoLog(computeProgram, sizeof(infoLog), NULL, infoLog);
+		std::cout << "ERROR::SHADER::COMPUTE::LINK_FAILED\n" << infoLog << std::endl;
+		exit(1);
 	}
 }
 
 void WaveSimulation::Add(int x, int y, float amp) {
-	const int r = Radius;
-	for (int row = - r; row <= + r; row++) {
-		if (((y + row) < 0) || ((y + row) >= height)) continue;
-		for (int col = - r; col <= + r; col++) {
-			if (((x + col) < 0) || ((x + col) >= width)) continue;
-			float l = (row * row + col * col);
-			if (row == 0 && col == 0) l = 0.5;
-			WaveSimulation::diff1[(y+row) * WaveSimulation::width + (x+col)] +=	amp * WaveSimulation::Force / l;
-		}
-	}
-	//WaveSimulation::diff1[y * WaveSimulation::width + x] += amp;
+	glm::vec3 forcePos = glm::vec3(x / (float)width, y / (float)height, amp);
+	glUniform3fv(glGetUniformLocation(computeProgram, "ForcePos"), 1, glm::value_ptr(forcePos));
 }
 
-void WaveSimulation::Update() {
-	for (int row = 0; row < WaveSimulation::height; row++) {
-		for (int col = 0; col < WaveSimulation::width; col++) {
-			//acc[row, col] += (valuesPad[row + 2, col + 1] - valuesPad[row + 1, col + 1]) - (valuesPad[row + 1, col + 1] - valuesPad[row + 0, col + 1])
-			//acc[row, col] += (valuesPad[row + 1, col + 2] - valuesPad[row + 1, col + 1]) - (valuesPad[row + 1, col + 1] - valuesPad[row + 1, col + 0])
+void WaveSimulation::Update(int x, int y, float amp, float deltaTime) {
+	unsigned int srcTexIdx = WaveSimulation::currTex;
+	unsigned int dstTexIdx = (WaveSimulation::currTex + 1) % 2;
+	WaveSimulation::currTex = dstTexIdx;
 
-			//WaveSimulation::diff2[row * WaveSimulation::width + col] +=
-			//	((((row + 1) < WaveSimulation::height) ? datas[(row + 1) * WaveSimulation::width + col + 0] : 0.5f) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
-			//	(datas[(row + 0) * WaveSimulation::width + col + 0] - (((row - 1) >= 0) ? datas[(row - 1) * WaveSimulation::width + col + 0] : 0.5f));
-			//WaveSimulation::diff2[row * WaveSimulation::width + col] +=
-			//	((((col + 1) < WaveSimulation::width) ? datas[(row + 0) * WaveSimulation::width + col + 1] : 0.5f) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
-			//	(datas[(row + 0) * WaveSimulation::width + col + 0] - (((col -1) >= 0) ? datas[(row + 0) * WaveSimulation::width + col - 1] : 0.5f));
+	glUseProgram(computeProgram);
+	glm::vec3 forcePos = glm::vec3(x / (float)width, y / (float)height, amp * WaveSimulation::Force);
+	glUniform3fv(glGetUniformLocation(computeProgram, "ForcePos"), 1, glm::value_ptr(forcePos));
+	glUniform1f(glGetUniformLocation(computeProgram, "Velocity"), WaveSimulation::Velocity);
+	glUniform1f(glGetUniformLocation(computeProgram, "Attenuation"), WaveSimulation::Attenuation);
 
-			//WaveSimulation::diff2[row * WaveSimulation::width + col] += 0.0001 * (0.5 - WaveSimulation::datas[row * WaveSimulation::width + col]);
-			WaveSimulation::diff2[row * WaveSimulation::width + col] +=
-				((((row + 1) < WaveSimulation::height) ? datas[(row + 1) * WaveSimulation::width + col + 0] : datas[(WaveSimulation::height - 1) * WaveSimulation::width + col + 0]) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
-				(datas[(row + 0) * WaveSimulation::width + col + 0] - (((row - 1) >= 0) ? datas[(row - 1) * WaveSimulation::width + col + 0] : datas[(0) * WaveSimulation::width + col + 0]));
-			WaveSimulation::diff2[row * WaveSimulation::width + col] +=
-				((((col + 1) < WaveSimulation::width) ? datas[(row + 0) * WaveSimulation::width + col + 1] : datas[(row + 0) * WaveSimulation::width + WaveSimulation::width - 1]) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
-				(datas[(row + 0) * WaveSimulation::width + col + 0] - (((col - 1) >= 0) ? datas[(row + 0) * WaveSimulation::width + col - 1] : datas[(row + 0) * WaveSimulation::width + 0]));
-		}
-	}
+	GLint uniformLocation;
 
-	for (unsigned int i = 0; i < WaveSimulation::width * WaveSimulation::height; i++) {
-		WaveSimulation::diff2[i] = WaveSimulation::diff2[i] * WaveSimulation::Velocity * WaveSimulation::Velocity
-			+ (0.01f) * (0.5f - WaveSimulation::datas[i]);
-		WaveSimulation::diff1[i] = WaveSimulation::diff1[i] * WaveSimulation::Attenuation + WaveSimulation::diff2[i];
-		WaveSimulation::datas[i] = WaveSimulation::datas[i] + WaveSimulation::diff1[i];
-	}
+	uniformLocation = glGetUniformLocation(computeProgram, "clear");
+	glUniform1i(uniformLocation, 0);
 
-	for (unsigned int i = 0; i < WaveSimulation::width * WaveSimulation::height; i++) {
-		WaveSimulation::diff2[i] = 0.0f;
-	}
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//glBindTexture(GL_TEXTURE_2D, WaveSimulation::diff1Tex[srcTexIdx]);
+	glBindImageTexture(0, WaveSimulation::diff1Tex[srcTexIdx], 0, GL_FALSE, 0, GL_READ_ONLY , GL_R32F);
+	uniformLocation = glGetUniformLocation(computeProgram, "diff1ImgSrc");
+	glUniform1i(uniformLocation, 0);
+
+	//glActiveTexture(GL_TEXTURE0 + 1);
+	//glBindTexture(GL_TEXTURE_2D, WaveSimulation::diff1Tex[dstTexIdx]);
+	glBindImageTexture(1, WaveSimulation::diff1Tex[dstTexIdx], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+	uniformLocation = glGetUniformLocation(computeProgram, "diff1ImgDst");
+	glUniform1i(uniformLocation, 1);
+
+	//glActiveTexture(GL_TEXTURE0 + 2);
+	//glBindTexture(GL_TEXTURE_2D, WaveSimulation::dataTex[srcTexIdx]);
+	glBindImageTexture(2, WaveSimulation::dataTex[srcTexIdx], 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+	uniformLocation = glGetUniformLocation(computeProgram, "dataImgSrc");
+	glUniform1i(uniformLocation, 2);
+
+	//glActiveTexture(GL_TEXTURE0 + 3);
+	//glBindTexture(GL_TEXTURE_2D, WaveSimulation::dataTex[dstTexIdx]);
+	glBindImageTexture(3, WaveSimulation::dataTex[dstTexIdx], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+	uniformLocation = glGetUniformLocation(computeProgram, "dataImgDst");
+	glUniform1i(uniformLocation, 3);
+
+	glDispatchCompute(WaveSimulation::width / 8, WaveSimulation::height / 4, 1);
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+
 }
 
 void WaveSimulation::Clear() {
-	for (unsigned int i = 0; i < width * height; i++) {
-		WaveSimulation::datas[i] = 0.5f;
-		WaveSimulation::diff1[i] = 0.0f;
-		WaveSimulation::diff2[i] = 0.0f;
-	}
+	glUseProgram(computeProgram);
+
+	GLint uniformLocation;
+	uniformLocation = glGetUniformLocation(computeProgram, "clear");
+	glUniform1i(uniformLocation, 1);
+
+	glDispatchCompute(WaveSimulation::width / 8, WaveSimulation::height / 4, 1);
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 void WaveSimulation::Delete() {
-	delete []WaveSimulation::datas;
-	delete []WaveSimulation::diff1;
-	delete []WaveSimulation::diff2;
 }
+
+//// CPU
+//void MainView::updateParameter(float deltaTime) {
+//	if (waterSimulationClear) {
+//		waterSimulation->Clear();
+//	}
+//	if ((MainView::waterType == MainView::WATERTYPE_SIMULATION) && MainView::waterRun) {
+//		if (glfwGetMouseButton(mainWindow->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+//			double mouseX, mouseY;
+//			glfwGetCursorPos(mainWindow->window, &mouseX, &mouseY);
+//			mouseX = mouseX;
+//			mouseY = (float)mainWindow->h() - mouseY;
+//
+//			//printf("%7.2d-%7.2d\n", mainWindow->w(), mainWindow->h());
+//			//printf("%7.2lf-%7.2lf\n", mouseX, mouseY);
+//
+//			glBindBuffer(GL_FRAMEBUFFER, fboClickpos);
+//			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+//			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+//			MainView::clickposShader->Activate();
+//			MainView::clickposShader->setUniform("view", MainView::mainCamera->transform_mat4);
+//			MainView::clickposShader->setUniform("model", MainView::waterModel->transform);
+//			MainView::waterModel->Draw();
+//
+//			float data[4];
+//			glPixelStoref(GL_UNPACK_ALIGNMENT, 1);
+//			glReadPixels(mouseX, mouseY, 1, 1, GL_RGBA, GL_FLOAT, data);
+//
+//			glBindBuffer(GL_FRAMEBUFFER, 0);
+//
+//			//printf("  %7.2lf-%7.2lf-%7.2lf\n", data[0], data[1], data[2]);
+//
+//			if (data[2] == 1.0f) {
+//				waterSimulation->Add(MainView::WATER_SIMULATION_RESOLUTION * data[0], MainView::WATER_SIMULATION_RESOLUTION * data[1], 0.1);
+//			}
+//		}
+//		waterSimulation->Update();
+//		glBindTexture(GL_TEXTURE_2D, TexSimulationWaterHeightID);
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, WATER_SIMULATION_RESOLUTION, WATER_SIMULATION_RESOLUTION, 0, GL_RED, GL_FLOAT, waterSimulation->datas);
+//		glBindTexture(GL_TEXTURE_2D, 0);
+//	}
+//}
+//
+//
+//WaveSimulation::WaveSimulation(int width, int height) {
+//	WaveSimulation::width = width;
+//	WaveSimulation::height = height;
+//
+//	WaveSimulation::datas = new float[width * height];
+//	WaveSimulation::diff1 = new float[width * height];
+//	WaveSimulation::diff2 = new float[width * height];
+//
+//	for (unsigned int i = 0; i < width * height; i++) {
+//		WaveSimulation::datas[i] = 0.5f;
+//		WaveSimulation::diff1[i] = 0.0f;
+//		WaveSimulation::diff2[i] = 0.0f;
+//	}
+//}
+//
+//void WaveSimulation::Add(int x, int y, float amp) {
+//	const int r = Radius;
+//	float min_t = ((r + 1) * (r + 1));
+//	min_t = powf(min_t, 0.5);
+//	min_t = 1 / min_t;
+//	for (int row = -r; row <= +r; row++) {
+//		if (((y + row) < 0) || ((y + row) >= height)) continue;
+//		for (int col = -r; col <= +r; col++) {
+//			if (((x + col) < 0) || ((x + col) >= width)) continue;
+//			float l = (row * row + col * col);
+//			if (l < 0.0f) l = 0.0f;
+//			if (row == 0 && col == 0) l = 0.5;
+//			l = powf(l, 0.5);
+//			float t = 1 / l - min_t;
+//			if (t < 0.0f) t = 0.0f;
+//			WaveSimulation::diff1[(y + row) * WaveSimulation::width + (x + col)] += t * amp * WaveSimulation::Force;
+//		}
+//	}
+//	//WaveSimulation::diff1[y * WaveSimulation::width + x] += amp;
+//}
+//
+//void WaveSimulation::Update() {
+//	for (int row = 0; row < WaveSimulation::height; row++) {
+//		for (int col = 0; col < WaveSimulation::width; col++) {
+//			//acc[row, col] += (valuesPad[row + 2, col + 1] - valuesPad[row + 1, col + 1]) - (valuesPad[row + 1, col + 1] - valuesPad[row + 0, col + 1])
+//			//acc[row, col] += (valuesPad[row + 1, col + 2] - valuesPad[row + 1, col + 1]) - (valuesPad[row + 1, col + 1] - valuesPad[row + 1, col + 0])
+//
+//			//WaveSimulation::diff2[row * WaveSimulation::width + col] +=
+//			//	((((row + 1) < WaveSimulation::height) ? datas[(row + 1) * WaveSimulation::width + col + 0] : 0.5f) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
+//			//	(datas[(row + 0) * WaveSimulation::width + col + 0] - (((row - 1) >= 0) ? datas[(row - 1) * WaveSimulation::width + col + 0] : 0.5f));
+//			//WaveSimulation::diff2[row * WaveSimulation::width + col] +=
+//			//	((((col + 1) < WaveSimulation::width) ? datas[(row + 0) * WaveSimulation::width + col + 1] : 0.5f) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
+//			//	(datas[(row + 0) * WaveSimulation::width + col + 0] - (((col -1) >= 0) ? datas[(row + 0) * WaveSimulation::width + col - 1] : 0.5f));
+//
+//			//WaveSimulation::diff2[row * WaveSimulation::width + col] += 0.0001 * (0.5 - WaveSimulation::datas[row * WaveSimulation::width + col]);
+//			WaveSimulation::diff2[row * WaveSimulation::width + col] +=
+//				((((row + 1) < WaveSimulation::height) ? datas[(row + 1) * WaveSimulation::width + col + 0] : datas[(WaveSimulation::height - 1) * WaveSimulation::width + col + 0]) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
+//				(datas[(row + 0) * WaveSimulation::width + col + 0] - (((row - 1) >= 0) ? datas[(row - 1) * WaveSimulation::width + col + 0] : datas[(0) * WaveSimulation::width + col + 0]));
+//			WaveSimulation::diff2[row * WaveSimulation::width + col] +=
+//				((((col + 1) < WaveSimulation::width) ? datas[(row + 0) * WaveSimulation::width + col + 1] : datas[(row + 0) * WaveSimulation::width + WaveSimulation::width - 1]) - datas[(row + 0) * WaveSimulation::width + col + 0]) -
+//				(datas[(row + 0) * WaveSimulation::width + col + 0] - (((col - 1) >= 0) ? datas[(row + 0) * WaveSimulation::width + col - 1] : datas[(row + 0) * WaveSimulation::width + 0]));
+//		}
+//	}
+//
+//	for (unsigned int i = 0; i < WaveSimulation::width * WaveSimulation::height; i++) {
+//		WaveSimulation::diff2[i] = WaveSimulation::diff2[i] * WaveSimulation::Velocity * WaveSimulation::Velocity
+//			+ (0.01f) * (0.5f - WaveSimulation::datas[i]);
+//		WaveSimulation::diff1[i] = WaveSimulation::diff1[i] * WaveSimulation::Attenuation + WaveSimulation::diff2[i];
+//		WaveSimulation::datas[i] = WaveSimulation::datas[i] + WaveSimulation::diff1[i];
+//	}
+//
+//	for (unsigned int i = 0; i < WaveSimulation::width * WaveSimulation::height; i++) {
+//		WaveSimulation::diff2[i] = 0.0f;
+//	}
+//}
+//
+//void WaveSimulation::Clear() {
+//	for (unsigned int i = 0; i < width * height; i++) {
+//		WaveSimulation::datas[i] = 0.5f;
+//		WaveSimulation::diff1[i] = 0.0f;
+//		WaveSimulation::diff2[i] = 0.0f;
+//	}
+//}
+//
+//void WaveSimulation::Delete() {
+//	delete[]WaveSimulation::datas;
+//	delete[]WaveSimulation::diff1;
+//	delete[]WaveSimulation::diff2;
+//}

@@ -12,6 +12,6 @@ newmtl Material__38
 	Kd 0.5880 0.5880 0.5880
 	Ks 0.0000 0.0000 0.0000
 	Ke 0.0000 0.0000 0.0000
-	map_Ka materials\floor_tiles_09_4k\floor_tiles_09_diff_1k.png
-	map_Kd materials\floor_tiles_09_4k\floor_tiles_09_diff_1k.png
-	map_Ks materials\floor_tiles_09_4k\floor_tiles_09_spec_1k.png
+	map_Ka materials\floor_tiles_09_4k\floor_tiles_09_diff_4k.png
+	map_Kd materials\floor_tiles_09_4k\floor_tiles_09_diff_4k.png
+	map_Ks materials\floor_tiles_09_4k\floor_tiles_09_spec_4k.png

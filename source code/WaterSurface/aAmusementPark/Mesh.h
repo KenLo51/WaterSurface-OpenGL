@@ -28,16 +28,20 @@ public:
 
 	std::vector <Vertex> vertices;
 	std::vector <GLuint> indices;
-	glm::mat4 transform;
 public:
 	// Mesh constructor
 	Mesh();
 	Mesh(std::vector <Vertex>& vertices, std::vector <GLuint>& indices);
 
-	//
+	// build VAO VBO EBO for openGL by vertices and indices
+	void init();
+
+	// load vertices and indices
 	void Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices);
 	// draw mesh
-	void Draw();
+	void Draw(GLenum mode = GL_TRIANGLES); // by indices array
+	void DrawArray(GLenum mode = GL_TRIANGLES); // by vertices array
+
 	// delete mesh
 	void Delete();
 };

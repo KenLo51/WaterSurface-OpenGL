@@ -118,6 +118,12 @@ void Model::LoadObj(const char* objFile) {
 					newMaterial->LoadTextures(Material::TYPE_SPECULAR, texturePath.c_str());
 				}
 
+				// load OPACITY texture
+				if (!currMaterial.alpha_texname.empty()) {
+					texturePath = base_dir + "/" + currMaterial.alpha_texname;
+					newMaterial->LoadTextures(Material::TYPE_OPACITY, texturePath.c_str());
+				}
+
 				//// load specular texture
 				//if (!currMaterial.normal_texname.empty() ||) {
 				//	texturePath = base_dir + "/" + currMaterial.normal_texname;
@@ -171,7 +177,7 @@ void Model::LoadObj(const char* objFile) {
 				vertices.push_back(newVertex);
 			}
 		}
-		printf("    %-5u vertices, %-5u indices, %-5u textures\n", vertices.size(), indices.size(), textures.size());
+		printf("    %5u vertices, %5u indices, %5u textures\n", vertices.size(), indices.size(), textures.size());
 
 		// calculate tangent
 		// https://www.cs.upc.edu/~virtual/G/1.%20Teoria/06.%20Textures/Tangent%20Space%20Calculation.pdf
@@ -338,6 +344,15 @@ void Model::Draw(Shader& shader) {
 		Texture::UnBind();
 	}
 }
+void Model::DrawDepths(Shader& shader) {
+	shader.setUniform("model", transform);
+	for (unsigned int meshIdx = 0; meshIdx < Model::meshs.size(); meshIdx++) {
+		if (materials[meshIdx])
+			materials[meshIdx]->Use(shader, Material::TYPE_OPACITY);
+		Model::meshs[meshIdx]->Draw();
+		Texture::UnBind();
+	}
+}
 
 // delete model
 void Model::Delete() {
@@ -350,15 +365,18 @@ void Model::Delete() {
 
 
 // Material
+const int Material::TYPE_ALL = 0;
 const int Material::TYPE_DIFFUSE = 1;
 const int Material::TYPE_AMBIENT = 2;
 const int Material::TYPE_SPECULAR = 3;
 const int Material::TYPE_NORMAL = 4;
-
+const int Material::TYPE_OPACITY = 5;
 Material::Material() {
 	Material::texDiffuse = NULL;
 	Material::texAmbient = NULL;
 	Material::texSpecular = NULL;
+	Material::texNormal = NULL;
+	Material::texAlpha = NULL;
 }
 
 void Material::LoadTextures(int type, const char* fileName) {
@@ -378,16 +396,68 @@ void Material::LoadTextures(int type, const char* fileName) {
 		Material::texNormal = new Texture(fileName);
 		return;
 	}
+	if (type == Material::TYPE_OPACITY) {
+		Material::texAlpha = new Texture(fileName);
+		return;
+	}
 }
-void Material::Use(Shader& shader) {
-	if (Material::texDiffuse)
-		Material::texDiffuse->BindAndUse(shader, "texDiffuse");
-	if (Material::texAmbient)
-		Material::texAmbient->BindAndUse(shader, "texAmbient");
-	if (Material::texSpecular)
-		Material::texSpecular->BindAndUse(shader, "texSpecular");
-	if (Material::texNormal)
-		Material::texNormal->BindAndUse(shader, "texNormal");
+void Material::Use(Shader& shader, const int useType) {
+	if (useType == Material::TYPE_ALL) {
+		if (Material::texDiffuse)
+			Material::texDiffuse->BindAndUse(shader, "texDiffuse");
+		if (Material::texAmbient)
+			Material::texAmbient->BindAndUse(shader, "texAmbient");
+		if (Material::texSpecular) {
+			shader.setUniform("ENABLE_SPECALUR", (int)1);
+			Material::texSpecular->BindAndUse(shader, "texSpecular");
+		}else {
+			shader.setUniform("ENABLE_SPECALUR", (int)0);
+		}
+		if (Material::texNormal)
+			Material::texNormal->BindAndUse(shader, "texNormal");
+		if (Material::texAlpha) {
+			shader.setUniform("ENABLE_OPACITY", (int)1);
+			Material::texAlpha->BindAndUse(shader, "texAlpha");
+		}
+		else {
+			shader.setUniform("ENABLE_OPACITY", (int)0);
+		}
+
+		return;
+	}
+	else {
+		if (useType == Material::TYPE_DIFFUSE) {
+			if (Material::texDiffuse)
+				Material::texDiffuse->BindAndUse(shader, "texDiffuse");
+			return;
+		}
+		if (useType == Material::TYPE_AMBIENT) {
+			if (Material::texAmbient)
+				Material::texAmbient->BindAndUse(shader, "texAmbient");
+			return;
+		}
+		if (useType == Material::TYPE_SPECULAR) {
+			if (Material::texSpecular)
+				Material::texSpecular->BindAndUse(shader, "texSpecular");
+			return;
+		}
+		if (useType == Material::TYPE_NORMAL) {
+			if (Material::texNormal)
+				Material::texNormal->BindAndUse(shader, "texNormal");
+			return;
+		}
+		if (useType == Material::TYPE_OPACITY) {
+			if (Material::texAlpha) {
+				shader.setUniform("ENABLE_OPACITY", (int)1);
+				Material::texAlpha->BindAndUse(shader, "texAlpha");
+			}
+			else {
+				shader.setUniform("ENABLE_OPACITY", (int)0);
+			}
+			return;
+		}
+	}
+
 }
 // delete textures
 void Material::Delete() {

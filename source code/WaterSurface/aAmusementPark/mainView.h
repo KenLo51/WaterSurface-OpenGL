@@ -54,6 +54,7 @@ private:
 	unsigned int depthMap;
 public:
 	MainWindow* mainWindow;
+	bool limitFrameRate;
 
 	//camears
 	Camera* mainCamera;
@@ -73,6 +74,7 @@ public:
 	float waterSpeed;
 	glm::vec2 waterSinTheta;
 	float waterAmpltidue;
+
 
 	WaveSimulation* waterSimulation;
 	bool waterSimulationClear;
@@ -122,21 +124,23 @@ public:
 	Skybox* skybox;
 };
 
+// ComputeShader WaveSimulation
 class WaveSimulation {
 private:
 public:
 	WaveSimulation(int width, int height);
 	void Add(int x, int y, float amp);
-	void Update();
+	void Update(int x, int y, float amp, float deltaTime);
 	void Clear();
 	void Delete();
 private:
-	float* diff1;
-	float* diff2;
+	GLuint diff1Tex[2];
+	GLuint computeShader, computeProgram;
 public:
+	unsigned int currTex;
 	unsigned int width;
 	unsigned int height;
-	float* datas;
+	GLuint dataTex[2];
 
 	float Attenuation = 0.999f;
 	float Velocity = 0.2f;

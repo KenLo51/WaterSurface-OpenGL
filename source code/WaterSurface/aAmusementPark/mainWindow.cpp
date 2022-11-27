@@ -40,8 +40,8 @@ void MainWindow::initWindow() {
 		return;
 	}
 
-	// OpenGL version 3.3
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	// OpenGL version 4.3
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 
 	// use OpenGL core profile

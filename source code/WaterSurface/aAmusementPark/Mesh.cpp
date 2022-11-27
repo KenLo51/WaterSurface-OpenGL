@@ -1,11 +1,11 @@
 #include "Mesh.h"
 
 
-bool VERTEX_TYPEDEF::operator ==(const VERTEX_TYPEDEF& a) {
+bool VERTEX_TYPEDEF::operator ==(const VERTEX_TYPEDEF& a) { 
 	for (unsigned int i = 0; i < sizeof(Vertex); i++) {
-		if (((char*)&a)[i] != ((char*)this)[i]) return false;
-	}
-	return true;
+		if (((char*)&a)[i] != ((char*)this)[i]) return false; 
+	} 
+	return true; 
 }
 
 // Mesh constructor
@@ -21,16 +21,9 @@ Mesh::Mesh(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
 
 	Mesh::Load(vertices, indices);
 }
-
-void Mesh::Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
-	if (Mesh::vao_ID != 0) {
-		Mesh::Delete();
-	}
-
-	Mesh::vertices = std::vector <Vertex>(vertices.begin(), vertices.end());
-	Mesh::indices = std::vector <GLuint>(indices.begin(), indices.end());
-
-	//printf("%u\n", Mesh::vertices.size());
+void Mesh::init() {
+	// delete previously mesh data
+	Delete();
 
 	// generate buffers
 	glGenVertexArrays(1, &(Mesh::vao_ID));
@@ -38,13 +31,13 @@ void Mesh::Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
 	glGenBuffers(1, &(Mesh::ebo_ID));
 
 	glBindVertexArray(Mesh::vao_ID);
-	
+
 	// Vertex Buffer Object
 	// bind VBO into VAO
 	glBindBuffer(GL_ARRAY_BUFFER, Mesh::vbo_ID);
 	//		copy vertex data to VBO
 	glBufferData(GL_ARRAY_BUFFER, Mesh::vertices.size() * sizeof(Vertex), Mesh::vertices.data(), GL_STATIC_DRAW);
-	
+
 	// Element Buffer Object
 	//		bind EBO into VAO
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Mesh::ebo_ID);
@@ -74,7 +67,7 @@ void Mesh::Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
 	//		link tangent
 	glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
 	glEnableVertexAttribArray(4);
-	
+
 
 	// unbind VAO
 	// NOTICE: Unbind VAO before EBO and VBO
@@ -86,26 +79,44 @@ void Mesh::Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
 	//		unbind VBO
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+void Mesh::Load(std::vector <Vertex>& vertices, std::vector <GLuint>& indices) {
+	if (Mesh::vao_ID != 0) {
+		Mesh::Delete();
+	}
+
+	Mesh::vertices = std::vector <Vertex>(vertices.begin(), vertices.end());
+	Mesh::indices = std::vector <GLuint>(indices.begin(), indices.end());
+
+	init();
+}
 
 // draw mesh
-void Mesh::Draw() {
+void Mesh::Draw(GLenum mode) {
 	// use vao
 	glBindVertexArray(Mesh::vao_ID);
-
-	// draw by VBO
-	//glDrawArrays(GL_TRIANGLES, 0, Mesh::indices.size());
 	// draw by EBO
-	glDrawElements(GL_TRIANGLES, Mesh::indices.size(), GL_UNSIGNED_INT, 0);
-
+	glDrawElements(mode, Mesh::indices.size(), GL_UNSIGNED_INT, 0);
+	// unbind vao
+	glBindVertexArray(0);
+}
+void Mesh::DrawArray(GLenum mode) {
+	// use vao
+	glBindVertexArray(Mesh::vao_ID);
+	// draw by VBO
+	glDrawArrays(mode, 0, Mesh::vertices.size());
 	// unbind vao
 	glBindVertexArray(0);
 }
 
+
 // delete mesh
 void Mesh::Delete() {
-	glDeleteVertexArrays(1, &(Mesh::vao_ID));
-	glDeleteBuffers(1, &(Mesh::vbo_ID));
-	glDeleteBuffers(1, &(Mesh::ebo_ID));
+	if(Mesh::vao_ID != 0)
+		glDeleteVertexArrays(1, &(Mesh::vao_ID));
+	if (Mesh::vbo_ID != 0)
+		glDeleteBuffers(1, &(Mesh::vbo_ID));
+	if (Mesh::ebo_ID != 0)
+		glDeleteBuffers(1, &(Mesh::ebo_ID));
 
 	Mesh::vao_ID = 0;
 	Mesh::vbo_ID = 0;
