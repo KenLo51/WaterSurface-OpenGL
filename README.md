@@ -1,4 +1,4 @@
-# ComputerGraph-WaterSurface
+# ComputerGraphic-WaterSurface
 
 1. OpenGL FBO(Frame Buffer Object)製作水面反射(Reflection map)、折射(Refraction map)。  
 2. 依據當下Camera位置，於相同位置但限制Refraction View確保可觀察水面正下方，並繪製Refraction Map。  
